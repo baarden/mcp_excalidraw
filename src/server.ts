@@ -6,9 +6,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import logger from './utils/logger.js';
-import { 
-  elements,
-  generateId, 
+import {
+  generateId,
   EXCALIDRAW_ELEMENT_TYPES,
   ServerElement,
   ExcalidrawElementType,
@@ -22,6 +21,8 @@ import {
 } from './types.js';
 import { z } from 'zod';
 import WebSocket from 'ws';
+import { StateManager, SingleRoomStateManager } from './stateManager.js';
+import { ClientManager, SingleRoomClientManager } from './clientManager.js';
 
 // Server configuration options
 export interface ServerOptions {
@@ -49,47 +50,38 @@ app.use(express.static(staticDir));
 // Also serve frontend assets
 app.use(express.static(path.join(__dirname, '../dist/frontend')));
 
-// WebSocket connections
-const clients = new Set<WebSocket>();
-
-// Broadcast to all connected clients
-function broadcast(message: WebSocketMessage): void {
-  const data = JSON.stringify(message);
-  clients.forEach(client => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(data);
-    }
-  });
-}
+// Initialize state and client managers
+const stateManager: StateManager = new SingleRoomStateManager();
+const clientManager: ClientManager = new SingleRoomClientManager();
 
 // WebSocket connection handling
 wss.on('connection', (ws: WebSocket) => {
-  clients.add(ws);
+  clientManager.addClient(ws);
   logger.info('New WebSocket connection established');
-  
+
   // Send current elements to new client
   const initialMessage: InitialElementsMessage = {
     type: 'initial_elements',
-    elements: Array.from(elements.values())
+    elements: Array.from(stateManager.getElements().values())
   };
   ws.send(JSON.stringify(initialMessage));
-  
+
   // Send sync status to new client
   const syncMessage: SyncStatusMessage = {
     type: 'sync_status',
-    elementCount: elements.size,
+    elementCount: stateManager.getElements().size,
     timestamp: new Date().toISOString()
   };
   ws.send(JSON.stringify(syncMessage));
-  
+
   ws.on('close', () => {
-    clients.delete(ws);
+    clientManager.removeClient(ws);
     logger.info('WebSocket connection closed');
   });
-  
+
   ws.on('error', (error) => {
     logger.error('WebSocket error:', error);
-    clients.delete(ws);
+    clientManager.removeClient(ws);
   });
 });
 
@@ -143,7 +135,7 @@ const UpdateElementSchema = z.object({
 // Get all elements
 app.get('/api/elements', (req: Request, res: Response) => {
   try {
-    const elementsArray = Array.from(elements.values());
+    const elementsArray = Array.from(stateManager.getElements().values());
     res.json({
       success: true,
       elements: elementsArray,
@@ -174,15 +166,15 @@ app.post('/api/elements', (req: Request, res: Response) => {
       version: 1
     };
 
-    elements.set(id, element);
-    
+    stateManager.setElement(id, element);
+
     // Broadcast to all connected clients
     const message: ElementCreatedMessage = {
       type: 'element_created',
       element: element
     };
-    broadcast(message);
-    
+    clientManager.broadcast(message);
+
     res.json({
       success: true,
       element: element
@@ -201,15 +193,15 @@ app.put('/api/elements/:id', (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const updates = UpdateElementSchema.parse({ id, ...req.body });
-    
+
     if (!id) {
       return res.status(400).json({
         success: false,
         error: 'Element ID is required'
       });
     }
-    
-    const existingElement = elements.get(id);
+
+    const existingElement = stateManager.getElement(id);
     if (!existingElement) {
       return res.status(404).json({
         success: false,
@@ -224,15 +216,15 @@ app.put('/api/elements/:id', (req: Request, res: Response) => {
       version: (existingElement.version || 0) + 1
     };
 
-    elements.set(id, updatedElement);
-    
+    stateManager.setElement(id, updatedElement);
+
     // Broadcast to all connected clients
     const message: ElementUpdatedMessage = {
       type: 'element_updated',
       element: updatedElement
     };
-    broadcast(message);
-    
+    clientManager.broadcast(message);
+
     res.json({
       success: true,
       element: updatedElement
@@ -250,30 +242,30 @@ app.put('/api/elements/:id', (req: Request, res: Response) => {
 app.delete('/api/elements/:id', (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    
+
     if (!id) {
       return res.status(400).json({
         success: false,
         error: 'Element ID is required'
       });
     }
-    
-    if (!elements.has(id)) {
+
+    if (!stateManager.getElement(id)) {
       return res.status(404).json({
         success: false,
         error: `Element with ID ${id} not found`
       });
     }
-    
-    elements.delete(id);
-    
+
+    stateManager.deleteElement(id);
+
     // Broadcast to all connected clients
     const message: ElementDeletedMessage = {
       type: 'element_deleted',
       elementId: id!
     };
-    broadcast(message);
-    
+    clientManager.broadcast(message);
+
     res.json({
       success: true,
       message: `Element ${id} deleted successfully`
@@ -291,7 +283,7 @@ app.delete('/api/elements/:id', (req: Request, res: Response) => {
 app.get('/api/elements/search', (req: Request, res: Response) => {
   try {
     const { type, ...filters } = req.query;
-    let results = Array.from(elements.values());
+    let results = Array.from(stateManager.getElements().values());
     
     // Filter by type if specified
     if (type && typeof type === 'string') {
@@ -333,8 +325,8 @@ app.get('/api/elements/:id', (req: Request, res: Response) => {
       });
     }
     
-    const element = elements.get(id);
-    
+    const element = stateManager.getElement(id);
+
     if (!element) {
       return res.status(404).json({
         success: false,
@@ -380,16 +372,16 @@ app.post('/api/elements/batch', (req: Request, res: Response) => {
         version: 1
       };
       
-      elements.set(id, element);
+      stateManager.setElement(id, element);
       createdElements.push(element);
     });
-    
+
     // Broadcast to all connected clients
     const message: BatchCreatedMessage = {
       type: 'elements_batch_created',
       elements: createdElements
     };
-    broadcast(message);
+    clientManager.broadcast(message);
     
     res.json({
       success: true,
@@ -423,7 +415,7 @@ app.post('/api/elements/from-mermaid', (req: Request, res: Response) => {
     });
     
     // Broadcast to all WebSocket clients to process the Mermaid diagram
-    broadcast({
+    clientManager.broadcast({
       type: 'mermaid_convert',
       mermaidDiagram,
       config: config || {},
@@ -465,21 +457,21 @@ app.post('/api/elements/sync', (req: Request, res: Response) => {
     }
     
     // Record element count before sync
-    const beforeCount = elements.size;
-    
+    const beforeCount = stateManager.getElements().size;
+
     // 1. Clear existing memory storage
-    elements.clear();
+    stateManager.clearElements();
     logger.info(`Cleared existing elements: ${beforeCount} elements removed`);
-    
+
     // 2. Batch write new data
     let successCount = 0;
     const processedElements: ServerElement[] = [];
-    
+
     frontendElements.forEach((element: any, index: number) => {
       try {
         // Ensure element has ID, generate one if missing
         const elementId = element.id || generateId();
-        
+
         // Add server metadata
         const processedElement: ServerElement = {
           ...element,
@@ -489,21 +481,21 @@ app.post('/api/elements/sync', (req: Request, res: Response) => {
           syncTimestamp: timestamp,
           version: 1
         };
-        
+
         // Store to memory
-        elements.set(elementId, processedElement);
+        stateManager.setElement(elementId, processedElement);
         processedElements.push(processedElement);
         successCount++;
-        
+
       } catch (elementError) {
         logger.warn(`Failed to process element ${index}:`, elementError);
       }
     });
-    
+
     logger.info(`Sync completed: ${successCount}/${frontendElements.length} elements synced`);
-    
+
     // 3. Broadcast sync event to all WebSocket clients
-    broadcast({
+    clientManager.broadcast({
       type: 'elements_synced',
       count: successCount,
       timestamp: new Date().toISOString(),
@@ -517,7 +509,7 @@ app.post('/api/elements/sync', (req: Request, res: Response) => {
       count: successCount,
       syncedAt: new Date().toISOString(),
       beforeCount,
-      afterCount: elements.size
+      afterCount: stateManager.getElements().size
     });
     
   } catch (error) {
@@ -546,8 +538,8 @@ app.get('/health', (req: Request, res: Response) => {
   res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    elements_count: elements.size,
-    websocket_clients: clients.size
+    elements_count: stateManager.getElements().size,
+    websocket_clients: clientManager.getClients().size
   });
 });
 
@@ -555,13 +547,13 @@ app.get('/health', (req: Request, res: Response) => {
 app.get('/api/sync/status', (req: Request, res: Response) => {
   res.json({
     success: true,
-    elementCount: elements.size,
+    elementCount: stateManager.getElements().size,
     timestamp: new Date().toISOString(),
     memoryUsage: {
       heapUsed: Math.round(process.memoryUsage().heapUsed / 1024 / 1024), // MB
       heapTotal: Math.round(process.memoryUsage().heapTotal / 1024 / 1024), // MB
     },
-    websocketClients: clients.size
+    websocketClients: clientManager.getClients().size
   });
 });
 
@@ -575,5 +567,5 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 });
 
 // Export server components for programmatic use
-export { app, server, wss, clients, elements, broadcast };
+export { app, server, wss, stateManager, clientManager };
 export default app;

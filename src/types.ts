@@ -240,9 +240,6 @@ export interface MermaidConversionResponse extends ApiResponse {
   count: number;
 }
 
-// In-memory storage for Excalidraw elements
-export const elements = new Map<string, ServerElement>();
-
 // Validation function for Excalidraw elements
 export function validateElement(element: Partial<ServerElement>): element is ServerElement {
   const requiredFields: (keyof ServerElement)[] = ['type', 'x', 'y'];
