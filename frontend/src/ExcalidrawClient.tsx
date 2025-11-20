@@ -64,6 +64,19 @@ interface ApiResponse {
 
 type SyncStatus = 'idle' | 'syncing' | 'success' | 'error';
 
+// ExcalidrawClient Props
+export interface ExcalidrawClientProps {
+  serverUrl?: string;
+  onConnect?: () => void;
+  onDisconnect?: () => void;
+  onSync?: (count: number) => void;
+  onSyncError?: (error: Error) => void;
+  initialData?: {
+    elements?: any[];
+    appState?: any;
+  };
+}
+
 // Helper function to clean elements for Excalidraw
 const cleanElementForExcalidraw = (element: ServerElement): Partial<ExcalidrawElement> => {
   const {
@@ -126,14 +139,10 @@ const validateAndFixBindings = (elements: Partial<ExcalidrawElement>[]): Partial
   });
 }
 
-function App(): JSX.Element {
+export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element {
   const [excalidrawAPI, setExcalidrawAPI] = useState<ExcalidrawAPIRefValue | null>(null)
   const [isConnected, setIsConnected] = useState<boolean>(false)
   const websocketRef = useRef<WebSocket | null>(null)
-  
-  // Sync state management
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle')
-  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null)
 
   // WebSocket connection
   useEffect(() => {
@@ -184,12 +193,13 @@ function App(): JSX.Element {
     
     websocketRef.current.onopen = () => {
       setIsConnected(true)
-      
+      props.onConnect?.()
+
       if (excalidrawAPI) {
         setTimeout(loadExistingElements, 100)
       }
     }
-    
+
     websocketRef.current.onmessage = (event: MessageEvent) => {
       try {
         const data: WebSocketMessage = JSON.parse(event.data)
@@ -198,16 +208,17 @@ function App(): JSX.Element {
         console.error('Error parsing WebSocket message:', error, event.data)
       }
     }
-    
+
     websocketRef.current.onclose = (event: CloseEvent) => {
       setIsConnected(false)
-      
+      props.onDisconnect?.()
+
       // Reconnect after 3 seconds if not a clean close
       if (event.code !== 1000) {
         setTimeout(connectWebSocket, 3000)
       }
     }
-    
+
     websocketRef.current.onerror = (error: Event) => {
       console.error('WebSocket error:', error)
       setIsConnected(false)
@@ -341,37 +352,17 @@ function App(): JSX.Element {
     } as ServerElement
   }
 
-  // Format sync time display
-  const formatSyncTime = (time: Date | null): string => {
-    if (!time) return ''
-    return time.toLocaleTimeString('zh-CN', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    })
-  }
-
-  // Main sync function
+  // Sync function
   const syncToBackend = async (): Promise<void> => {
     if (!excalidrawAPI) {
-      console.warn('Excalidraw API not available')
       return
     }
-    
-    setSyncStatus('syncing')
-    
+
     try {
-      // 1. Get current elements
       const currentElements = excalidrawAPI.getSceneElements()
-      console.log(`Syncing ${currentElements.length} elements to backend`)
-      
-      // Filter out deleted elements
       const activeElements = currentElements.filter(el => !el.isDeleted)
-      
-      // 3. Convert to backend format
       const backendElements = activeElements.map(convertToBackendFormat)
-      
-      // 4. Send to backend
+
       const response = await fetch('/api/elements/sync', {
         method: 'POST',
         headers: {
@@ -382,113 +373,31 @@ function App(): JSX.Element {
           timestamp: new Date().toISOString()
         })
       })
-      
+
       if (response.ok) {
         const result: ApiResponse = await response.json()
-        setSyncStatus('success')
-        setLastSyncTime(new Date())
-        console.log(`Sync successful: ${result.count} elements synced`)
-        
-        // Reset status after 2 seconds
-        setTimeout(() => setSyncStatus('idle'), 2000)
+        props.onSync?.(result.count || 0)
       } else {
-        const error: ApiResponse = await response.json()
-        setSyncStatus('error')
-        console.error('Sync failed:', error.error)
+        throw new Error('Sync failed')
       }
     } catch (error) {
-      setSyncStatus('error')
-      console.error('Sync error:', error)
-    }
-  }
-
-  const clearCanvas = async (): Promise<void> => {
-    if (excalidrawAPI) {
-      try {
-        // Get all current elements and delete them from backend
-        const response = await fetch('/api/elements')
-        const result: ApiResponse = await response.json()
-        
-        if (result.success && result.elements) {
-          const deletePromises = result.elements.map(element => 
-            fetch(`/api/elements/${element.id}`, { method: 'DELETE' })
-          )
-          await Promise.all(deletePromises)
-        }
-        
-        // Clear the frontend canvas
-        excalidrawAPI.updateScene({ 
-          elements: [],
-          captureUpdate: CaptureUpdateAction.IMMEDIATELY
-        })
-      } catch (error) {
-        console.error('Error clearing canvas:', error)
-        // Still clear frontend even if backend fails
-        excalidrawAPI.updateScene({ 
-          elements: [],
-          captureUpdate: CaptureUpdateAction.IMMEDIATELY
-        })
-      }
+      props.onSyncError?.(error as Error)
     }
   }
 
   return (
-    <div className="app">
-      {/* Header */}
-      <div className="header">
-        <h1>Excalidraw Canvas</h1>
-        <div className="controls">
-          <div className="status">
-            <div className={`status-dot ${isConnected ? 'status-connected' : 'status-disconnected'}`}></div>
-            <span>{isConnected ? 'Connected' : 'Disconnected'}</span>
-          </div>
-          
-          {/* Sync Controls */}
-          <div className="sync-controls">
-            <button 
-              className={`btn-primary ${syncStatus === 'syncing' ? 'btn-loading' : ''}`}
-              onClick={syncToBackend}
-              disabled={syncStatus === 'syncing' || !excalidrawAPI}
-            >
-              {syncStatus === 'syncing' && <span className="spinner"></span>}
-              {syncStatus === 'syncing' ? 'Syncing...' : 'Sync to Backend'}
-            </button>
-            
-            {/* Sync Status */}
-            <div className="sync-status">
-              {syncStatus === 'success' && (
-                <span className="sync-success">✅ Synced</span>
-              )}
-              {syncStatus === 'error' && (
-                <span className="sync-error">❌ Sync Failed</span>
-              )}
-              {lastSyncTime && syncStatus === 'idle' && (
-                <span className="sync-time">
-                  Last sync: {formatSyncTime(lastSyncTime)}
-                </span>
-              )}
-            </div>
-          </div>
-          
-          <button className="btn-secondary" onClick={clearCanvas}>Clear Canvas</button>
-        </div>
-      </div>
-
-      {/* Canvas Container */}
-      <div className="canvas-container">
-        <Excalidraw
-          excalidrawAPI={(api: ExcalidrawAPIRefValue) => setExcalidrawAPI(api)}
-          initialData={{
-            elements: [],
-            appState: {
-              theme: 'light',
-              viewBackgroundColor: '#ffffff'
-            }
-          }}
-        />
-      </div>
-    </div>
+    <Excalidraw
+      excalidrawAPI={(api: ExcalidrawAPIRefValue) => setExcalidrawAPI(api)}
+      initialData={props.initialData || {
+        elements: [],
+        appState: {
+          theme: 'light',
+          viewBackgroundColor: '#ffffff'
+        }
+      }}
+    />
   )
 }
 
-export default App
+// Export types for external use
+export type { ServerElement, WebSocketMessage, ApiResponse, SyncStatus }
