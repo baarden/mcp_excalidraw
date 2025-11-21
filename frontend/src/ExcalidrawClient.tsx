@@ -144,6 +144,9 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
   const [isConnected, setIsConnected] = useState<boolean>(false)
   const websocketRef = useRef<WebSocket | null>(null)
 
+  // Derive base URL for both HTTP and WebSocket connections
+  const baseUrl = props.serverUrl || (typeof window !== 'undefined' ? window.location.origin : '')
+
   // WebSocket connection
   useEffect(() => {
     connectWebSocket()
@@ -168,7 +171,7 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
 
   const loadExistingElements = async (): Promise<void> => {
     try {
-      const response = await fetch('/api/elements')
+      const response = await fetch(`${baseUrl}/api/elements`)
       const result: ApiResponse = await response.json()
       
       if (result.success && result.elements && result.elements.length > 0) {
@@ -186,9 +189,10 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
       return
     }
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsUrl = `${protocol}//${window.location.host}`
-    
+    // Convert HTTP(S) URL to WS(S) URL
+    const protocol = baseUrl.startsWith('https') ? 'wss:' : 'ws:'
+    const wsUrl = baseUrl.replace(/^https?:/, protocol)
+
     websocketRef.current = new WebSocket(wsUrl)
     
     websocketRef.current.onopen = () => {
@@ -363,7 +367,7 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
       const activeElements = currentElements.filter(el => !el.isDeleted)
       const backendElements = activeElements.map(convertToBackendFormat)
 
-      const response = await fetch('/api/elements/sync', {
+      const response = await fetch(`${baseUrl}/api/elements/sync`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
