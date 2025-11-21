@@ -148,8 +148,8 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
   // Derive base URL for both HTTP and WebSocket connections
   const baseUrl = props.serverUrl || (typeof window !== 'undefined' ? window.location.origin : '')
 
-  // Room ID query parameter for multi-room support
-  const roomIdParam = props.roomId ? `?roomId=${encodeURIComponent(props.roomId)}` : ''
+  // Room ID path segment for multi-room support
+  const roomIdPath = props.roomId ? `/${props.roomId}` : ''
 
   // WebSocket connection
   useEffect(() => {
@@ -175,7 +175,7 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
 
   const loadExistingElements = async (): Promise<void> => {
     try {
-      const response = await fetch(`${baseUrl}/api/elements${roomIdParam}`)
+      const response = await fetch(`${baseUrl}/api/elements${roomIdPath}`)
       const result: ApiResponse = await response.json()
       
       if (result.success && result.elements && result.elements.length > 0) {
@@ -196,7 +196,7 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
     // Convert HTTP(S) URL to WS(S) URL
     const protocol = baseUrl.startsWith('https') ? 'wss:' : 'ws:'
     const wsBaseUrl = baseUrl.replace(/^https?:/, protocol)
-    const wsUrl = `${wsBaseUrl}${roomIdParam}`
+    const wsUrl = `${wsBaseUrl}${roomIdPath}`
 
     websocketRef.current = new WebSocket(wsUrl)
     
@@ -372,7 +372,7 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
       const activeElements = currentElements.filter(el => !el.isDeleted)
       const backendElements = activeElements.map(convertToBackendFormat)
 
-      const response = await fetch(`${baseUrl}/api/elements/sync${roomIdParam}`, {
+      const response = await fetch(`${baseUrl}/api/elements/sync${roomIdPath}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
