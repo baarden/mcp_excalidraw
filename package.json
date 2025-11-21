@@ -8,10 +8,22 @@
     "mcp-excalidraw-server": "dist/index.js"
   },
   "exports": {
-    ".": "./dist/index.js",
-    "./server": "./dist/server.js",
-    "./client": "./frontend/src/ExcalidrawClient.tsx",
-    "./types": "./dist/types.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
+    },
+    "./client": {
+      "types": "./frontend/src/ExcalidrawClient.tsx",
+      "default": "./frontend/src/ExcalidrawClient.tsx"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "default": "./dist/types.js"
+    }
   },
   "peerDependencies": {
     "react": "^18.0.0",
