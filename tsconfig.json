@@ -39,6 +39,7 @@
     "node_modules",
     "dist",
     "frontend",
+    "src/lib.ts",
     "**/*.test.ts",
     "**/*.spec.ts",
     "**/*.js",

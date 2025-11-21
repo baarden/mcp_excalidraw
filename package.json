@@ -7,6 +7,17 @@
   "bin": {
     "mcp-excalidraw-server": "dist/index.js"
   },
+  "exports": {
+    ".": "./dist/index.js",
+    "./server": "./dist/server.js",
+    "./client": "./frontend/src/ExcalidrawClient.tsx",
+    "./types": "./dist/types.js"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "@excalidraw/excalidraw": "^0.18.0"
+  },
   "scripts": {
     "start": "npm run build:server && node dist/index.js",
     "canvas": "npm run build:server && node dist/start-server.js",
@@ -86,6 +97,7 @@
   },
   "files": [
     "src/**/*",
+    "frontend/src/**/*",
     "dist/**/*",
     "*.d.ts",
     "README.md",
