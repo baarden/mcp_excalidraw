@@ -67,6 +67,7 @@ type SyncStatus = 'idle' | 'syncing' | 'success' | 'error';
 // ExcalidrawClient Props
 export interface ExcalidrawClientProps {
   serverUrl?: string;
+  roomId?: string;
   onConnect?: () => void;
   onDisconnect?: () => void;
   onSync?: (count: number) => void;
@@ -147,6 +148,9 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
   // Derive base URL for both HTTP and WebSocket connections
   const baseUrl = props.serverUrl || (typeof window !== 'undefined' ? window.location.origin : '')
 
+  // Room ID query parameter for multi-room support
+  const roomIdParam = props.roomId ? `?roomId=${encodeURIComponent(props.roomId)}` : ''
+
   // WebSocket connection
   useEffect(() => {
     connectWebSocket()
@@ -171,7 +175,7 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
 
   const loadExistingElements = async (): Promise<void> => {
     try {
-      const response = await fetch(`${baseUrl}/api/elements`)
+      const response = await fetch(`${baseUrl}/api/elements${roomIdParam}`)
       const result: ApiResponse = await response.json()
       
       if (result.success && result.elements && result.elements.length > 0) {
@@ -191,7 +195,8 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
 
     // Convert HTTP(S) URL to WS(S) URL
     const protocol = baseUrl.startsWith('https') ? 'wss:' : 'ws:'
-    const wsUrl = baseUrl.replace(/^https?:/, protocol)
+    const wsBaseUrl = baseUrl.replace(/^https?:/, protocol)
+    const wsUrl = `${wsBaseUrl}${roomIdParam}`
 
     websocketRef.current = new WebSocket(wsUrl)
     
@@ -367,7 +372,7 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
       const activeElements = currentElements.filter(el => !el.isDeleted)
       const backendElements = activeElements.map(convertToBackendFormat)
 
-      const response = await fetch(`${baseUrl}/api/elements/sync`, {
+      const response = await fetch(`${baseUrl}/api/elements/sync${roomIdParam}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
