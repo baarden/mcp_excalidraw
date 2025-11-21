@@ -23,6 +23,14 @@
     "./types": {
       "types": "./dist/types.d.ts",
       "default": "./dist/types.js"
+    },
+    "./stateManager": {
+      "types": "./dist/stateManager.d.ts",
+      "default": "./dist/stateManager.js"
+    },
+    "./clientManager": {
+      "types": "./dist/clientManager.d.ts",
+      "default": "./dist/clientManager.js"
     }
   },
   "peerDependencies": {
