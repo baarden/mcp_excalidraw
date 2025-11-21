@@ -31,6 +31,10 @@
     "./clientManager": {
       "types": "./dist/clientManager.d.ts",
       "default": "./dist/clientManager.js"
+    },
+    "./client/utils": {
+      "types": "./frontend/src/utils/mermaidConverter.ts",
+      "default": "./frontend/src/utils/mermaidConverter.ts"
     }
   },
   "peerDependencies": {
