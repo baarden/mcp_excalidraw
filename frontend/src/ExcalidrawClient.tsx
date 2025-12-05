@@ -146,6 +146,10 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
   const [excalidrawAPI, setExcalidrawAPI] = useState<ExcalidrawAPIRefValue | null>(null)
   const [isConnected, setIsConnected] = useState<boolean>(false)
   const websocketRef = useRef<WebSocket | null>(null)
+  const excalidrawAPIRef = useRef<ExcalidrawAPIRefValue | null>(null)
+
+  // Keep ref in sync with state to avoid closure issues
+  excalidrawAPIRef.current = excalidrawAPI
 
   // Derive base URL for both HTTP and WebSocket connections
   const baseUrl = props.serverUrl || (typeof window !== 'undefined' ? window.location.origin : '')
@@ -369,12 +373,12 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
 
   // Sync function
   const syncToBackend = async (): Promise<void> => {
-    if (!excalidrawAPI) {
+    if (!excalidrawAPIRef.current) {
       return
     }
 
     try {
-      const currentElements = excalidrawAPI.getSceneElements()
+      const currentElements = excalidrawAPIRef.current.getSceneElements()
       const activeElements = currentElements.filter(el => !el.isDeleted)
       const backendElements = activeElements.map(convertToBackendFormat)
 
