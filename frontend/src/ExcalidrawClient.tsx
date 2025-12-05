@@ -250,7 +250,6 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
 
     try {
       const currentElements = excalidrawAPI.getSceneElements()
-      console.log('Current elements:', currentElements);
 
       switch (data.type) {
         case 'initial_elements':
@@ -314,16 +313,13 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
           break
           
         case 'elements_synced':
-          console.log(`Sync confirmed by server: ${data.count} elements`)
           // Sync confirmation already handled by HTTP response
           break
-          
+
         case 'sync_status':
-          console.log(`Server sync status: ${data.count} elements`)
           break
           
         case 'mermaid_convert':
-          console.log('Received Mermaid conversion request from MCP')
           if (data.mermaidDiagram) {
             try {
               const result = await convertMermaidToExcalidraw(data.mermaidDiagram, data.config || DEFAULT_MERMAID_CONFIG)
@@ -343,8 +339,6 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
                 if (result.files) {
                   excalidrawAPI.addFiles(Object.values(result.files))
                 }
-
-                console.log('Mermaid diagram converted successfully:', result.elements.length, 'elements')
 
                 // Sync to backend automatically after creating elements
                 await syncToBackend()
