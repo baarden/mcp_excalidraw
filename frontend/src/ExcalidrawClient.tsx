@@ -147,6 +147,7 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
   const [isConnected, setIsConnected] = useState<boolean>(false)
   const websocketRef = useRef<WebSocket | null>(null)
   const excalidrawAPIRef = useRef<ExcalidrawAPIRefValue | null>(null)
+  const mountedRef = useRef(true)
 
   // Keep ref in sync with state to avoid closure issues
   excalidrawAPIRef.current = excalidrawAPI
@@ -159,8 +160,10 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
 
   // WebSocket connection
   useEffect(() => {
+    mountedRef.current = true
     connectWebSocket()
     return () => {
+      mountedRef.current = false
       if (websocketRef.current) {
         websocketRef.current.close()
       }
@@ -235,8 +238,8 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
       setIsConnected(false)
       props.onDisconnect?.()
 
-      // Reconnect after 3 seconds if not a clean close
-      if (event.code !== 1000) {
+      // Reconnect after 3 seconds if not a clean close and still mounted
+      if (event.code !== 1000 && mountedRef.current) {
         setTimeout(connectWebSocket, 3000)
       }
     }
