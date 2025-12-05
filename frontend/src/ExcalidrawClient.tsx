@@ -204,7 +204,9 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
   }
 
   const connectWebSocket = (): void => {
-    if (websocketRef.current && websocketRef.current.readyState === WebSocket.OPEN) {
+    if (websocketRef.current &&
+        (websocketRef.current.readyState === WebSocket.OPEN ||
+         websocketRef.current.readyState === WebSocket.CONNECTING)) {
       return
     }
 
