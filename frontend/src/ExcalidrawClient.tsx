@@ -164,7 +164,7 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
     connectWebSocket()
     return () => {
       mountedRef.current = false
-      if (websocketRef.current) {
+      if (websocketRef.current?.readyState === WebSocket.OPEN) {
         websocketRef.current.close()
       }
     }
@@ -247,7 +247,9 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
     }
 
     websocketRef.current.onerror = (error: Event) => {
-      console.error('WebSocket error:', error)
+      if (mountedRef.current) {
+        console.error('WebSocket error:', error)
+      }
       setIsConnected(false)
     }
   }
