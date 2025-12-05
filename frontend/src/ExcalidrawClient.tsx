@@ -256,7 +256,10 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
           if (data.elements && data.elements.length > 0) {
             const cleanedElements = data.elements.map(cleanElementForExcalidraw)
             const validatedElements = validateAndFixBindings(cleanedElements)
-            const convertedElements = convertToExcalidrawElements(validatedElements)
+            const convertedElements = convertToExcalidrawElements(
+              validatedElements,
+              { regenerateIds: false }
+            )
             excalidrawAPI.updateScene({
               elements: convertedElements,
               captureUpdate: CaptureUpdateAction.NEVER
