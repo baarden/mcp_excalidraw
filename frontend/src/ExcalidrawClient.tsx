@@ -142,6 +142,23 @@ const validateAndFixBindings = (elements: Partial<ExcalidrawElement>[]): Partial
   });
 }
 
+// Helper to convert elements while preserving bindings that convertToExcalidrawElements strips
+const convertAndRestoreBindings = (
+  elements: Partial<ExcalidrawElement>[]
+): ExcalidrawElement[] => {
+  const convertedElements = convertToExcalidrawElements(elements, { regenerateIds: false })
+  return convertedElements.map((el, i) => {
+    const original = elements[i] as any
+    const converted = el as any
+    return {
+      ...el,
+      startBinding: original.startBinding ?? converted.startBinding,
+      endBinding: original.endBinding ?? converted.endBinding,
+      boundElements: original.boundElements ?? converted.boundElements,
+    }
+  }) as ExcalidrawElement[]
+}
+
 export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element {
   const [excalidrawAPI, setExcalidrawAPI] = useState<ExcalidrawAPIRefValue | null>(null)
   const websocketRef = useRef<WebSocket | null>(null)
@@ -179,8 +196,8 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
       
       if (result.success && result.elements && result.elements.length > 0) {
         const cleanedElements = result.elements.map(cleanElementForExcalidraw)
-        const convertedElements = convertToExcalidrawElements(cleanedElements, { regenerateIds: false })
-        excalidrawAPI?.updateScene({ elements: convertedElements })
+        const elements = convertAndRestoreBindings(cleanedElements)
+        excalidrawAPI?.updateScene({ elements })
       }
     } catch (error) {
       console.error('Error loading existing elements:', error)
@@ -250,12 +267,9 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
           if (data.elements && data.elements.length > 0) {
             const cleanedElements = data.elements.map(cleanElementForExcalidraw)
             const validatedElements = validateAndFixBindings(cleanedElements)
-            const convertedElements = convertToExcalidrawElements(
-              validatedElements,
-              { regenerateIds: false }
-            )
+            const elements = convertAndRestoreBindings(validatedElements)
             excalidrawAPI.updateScene({
-              elements: convertedElements,
+              elements,
               captureUpdate: CaptureUpdateAction.NEVER
             })
           }
@@ -264,10 +278,9 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
         case 'element_created':
           if (data.element) {
             const cleanedNewElement = cleanElementForExcalidraw(data.element)
-            const newElement = convertToExcalidrawElements([cleanedNewElement])
-            const updatedElementsAfterCreate = [...currentElements, ...newElement]
-            excalidrawAPI.updateScene({ 
-              elements: updatedElementsAfterCreate,
+            const newElements = convertAndRestoreBindings([cleanedNewElement])
+            excalidrawAPI.updateScene({
+              elements: [...currentElements, ...newElements],
               captureUpdate: CaptureUpdateAction.NEVER
             })
           }
@@ -276,12 +289,11 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
         case 'element_updated':
           if (data.element) {
             const cleanedUpdatedElement = cleanElementForExcalidraw(data.element)
-            const convertedUpdatedElement = convertToExcalidrawElements([cleanedUpdatedElement])[0]
-            const updatedElements = currentElements.map(el =>
-              el.id === data.element!.id ? convertedUpdatedElement : el
-            )
+            const updatedElement = convertAndRestoreBindings([cleanedUpdatedElement])[0]
             excalidrawAPI.updateScene({
-              elements: updatedElements,
+              elements: currentElements.map(el =>
+                el.id === data.element!.id ? updatedElement : el
+              ),
               captureUpdate: CaptureUpdateAction.NEVER
             })
           }
@@ -300,10 +312,9 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
         case 'elements_batch_created':
           if (data.elements) {
             const cleanedBatchElements = data.elements.map(cleanElementForExcalidraw)
-            const batchElements = convertToExcalidrawElements(cleanedBatchElements)
-            const updatedElementsAfterBatch = [...currentElements, ...batchElements]
-            excalidrawAPI.updateScene({ 
-              elements: updatedElementsAfterBatch,
+            const batchElements = convertAndRestoreBindings(cleanedBatchElements)
+            excalidrawAPI.updateScene({
+              elements: [...currentElements, ...batchElements],
               captureUpdate: CaptureUpdateAction.NEVER
             })
           }
