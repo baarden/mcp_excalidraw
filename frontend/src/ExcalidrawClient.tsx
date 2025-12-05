@@ -72,6 +72,8 @@ export interface ExcalidrawClientProps {
   onDisconnect?: () => void;
   onSync?: (count: number) => void;
   onSyncError?: (error: Error) => void;
+  onMessage?: (message: WebSocketMessage) => void;
+  onReady?: (api: { send: (message: unknown) => void }) => void;
   initialData?: {
     elements?: any[];
     appState?: any;
@@ -188,6 +190,12 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
     }
   }
 
+  const send = (message: unknown): void => {
+    if (websocketRef.current?.readyState === WebSocket.OPEN) {
+      websocketRef.current.send(JSON.stringify(message))
+    }
+  }
+
   const connectWebSocket = (): void => {
     if (websocketRef.current && websocketRef.current.readyState === WebSocket.OPEN) {
       return
@@ -203,6 +211,7 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
     websocketRef.current.onopen = () => {
       setIsConnected(true)
       props.onConnect?.()
+      props.onReady?.({ send })
 
       if (excalidrawAPI) {
         setTimeout(loadExistingElements, 100)
@@ -347,7 +356,7 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
           break
           
         default:
-          console.log('Unknown WebSocket message type:', data.type)
+          props.onMessage?.(data)
       }
     } catch (error) {
       console.error('Error processing WebSocket message:', error, data)
