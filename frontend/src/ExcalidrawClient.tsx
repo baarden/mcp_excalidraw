@@ -144,7 +144,6 @@ const validateAndFixBindings = (elements: Partial<ExcalidrawElement>[]): Partial
 
 export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element {
   const [excalidrawAPI, setExcalidrawAPI] = useState<ExcalidrawAPIRefValue | null>(null)
-  const [isConnected, setIsConnected] = useState<boolean>(false)
   const websocketRef = useRef<WebSocket | null>(null)
   const excalidrawAPIRef = useRef<ExcalidrawAPIRefValue | null>(null)
   const mountedRef = useRef(true)
@@ -158,29 +157,20 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
   // Room ID path segment for multi-room support
   const roomIdPath = props.roomId ? `/${props.roomId}` : ''
 
-  // WebSocket connection
+  // WebSocket connection - wait for excalidrawAPI before connecting
   useEffect(() => {
+    if (!excalidrawAPI) return
+
     mountedRef.current = true
     connectWebSocket()
+    loadExistingElements()
     return () => {
       mountedRef.current = false
       if (websocketRef.current?.readyState === WebSocket.OPEN) {
         websocketRef.current.close()
       }
     }
-  }, [])
-
-  // Load existing elements when Excalidraw API becomes available
-  useEffect(() => {
-    if (excalidrawAPI) {
-      loadExistingElements()
-      
-      // Ensure WebSocket is connected for real-time updates
-      if (!isConnected) {
-        connectWebSocket()
-      }
-    }
-  }, [excalidrawAPI, isConnected])
+  }, [excalidrawAPI])
 
   const loadExistingElements = async (): Promise<void> => {
     try {
@@ -218,13 +208,8 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
     websocketRef.current = new WebSocket(wsUrl)
     
     websocketRef.current.onopen = () => {
-      setIsConnected(true)
       props.onConnect?.()
       props.onReady?.({ send, syncToBackend })
-
-      if (excalidrawAPI) {
-        setTimeout(loadExistingElements, 100)
-      }
     }
 
     websocketRef.current.onmessage = (event: MessageEvent) => {
@@ -237,7 +222,6 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
     }
 
     websocketRef.current.onclose = (event: CloseEvent) => {
-      setIsConnected(false)
       props.onDisconnect?.()
 
       // Reconnect after 3 seconds if not a clean close and still mounted
@@ -250,7 +234,6 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
       if (mountedRef.current) {
         console.error('WebSocket error:', error)
       }
-      setIsConnected(false)
     }
   }
 
