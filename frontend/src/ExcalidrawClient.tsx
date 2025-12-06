@@ -163,7 +163,6 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
 
     mountedRef.current = true
     connectWebSocket()
-    loadExistingElements()
     return () => {
       mountedRef.current = false
       if (websocketRef.current?.readyState === WebSocket.OPEN) {
@@ -171,21 +170,6 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
       }
     }
   }, [excalidrawAPI])
-
-  const loadExistingElements = async (): Promise<void> => {
-    try {
-      const response = await fetch(`${baseUrl}/api/elements${roomIdPath}`)
-      const result: ApiResponse = await response.json()
-      
-      if (result.success && result.elements && result.elements.length > 0) {
-        const cleanedElements = result.elements.map(cleanElementForExcalidraw)
-        const convertedElements = convertToExcalidrawElements(cleanedElements, { regenerateIds: false })
-        excalidrawAPI?.updateScene({ elements: convertedElements })
-      }
-    } catch (error) {
-      console.error('Error loading existing elements:', error)
-    }
-  }
 
   const send = (message: unknown): void => {
     if (websocketRef.current?.readyState === WebSocket.OPEN) {
