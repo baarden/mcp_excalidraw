@@ -74,7 +74,7 @@ export interface ExcalidrawClientProps {
   onSync?: (count: number) => void;
   onSyncError?: (error: Error) => void;
   onMessage?: (message: WebSocketMessage) => void;
-  onReady?: (api: { send: (message: unknown) => void; syncToBackend: () => Promise<void> }) => void;
+  onReady?: (api: { send: (message: unknown) => void; syncToBackend: () => Promise<void>; excalidrawAPI: ExcalidrawImperativeAPI }) => void;
   initialData?: {
     elements?: any[];
     appState?: any;
@@ -194,7 +194,7 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
     
     websocketRef.current.onopen = () => {
       props.onConnect?.()
-      props.onReady?.({ send, syncToBackend })
+      props.onReady?.({ send, syncToBackend, excalidrawAPI: excalidrawAPI! })
     }
 
     websocketRef.current.onmessage = (event: MessageEvent) => {
