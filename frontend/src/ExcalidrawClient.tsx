@@ -68,6 +68,7 @@ type SyncStatus = 'idle' | 'syncing' | 'success' | 'error';
 export interface ExcalidrawClientProps {
   serverUrl?: string;
   roomId?: string;
+  theme?: 'light' | 'dark';
   onConnect?: () => void;
   onDisconnect?: () => void;
   onSync?: (count: number) => void;
@@ -376,12 +377,9 @@ export function ExcalidrawClient(props: ExcalidrawClientProps = {}): JSX.Element
   return (
     <Excalidraw
       excalidrawAPI={(api: ExcalidrawAPIRefValue) => setExcalidrawAPI(api)}
+      theme={props.theme ?? 'light'}
       initialData={props.initialData || {
-        elements: [],
-        appState: {
-          theme: 'light',
-          viewBackgroundColor: '#ffffff'
-        }
+        elements: []
       }}
     />
   )
